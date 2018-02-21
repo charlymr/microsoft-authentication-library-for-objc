@@ -43,7 +43,7 @@ static MSALWebUI *s_currentWebSession = nil;
 @property (readwrite) MSALWebUICompletionBlock completionBlock;
 @property (readwrite) id<MSALRequestContext> context;
 @property (readwrite) NSString* telemetryRequestId;
-@property (readwrite) MSALTelemetryUIEvent* telemetryEvent;
+@property (readwrite) MSIDTelemetryUIEvent* telemetryEvent;
 
 @end
 
