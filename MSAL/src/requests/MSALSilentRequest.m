@@ -32,10 +32,10 @@
 #import "MSALTokenCache.h"
 
 #import "MSALTelemetryAPIEvent.h"
-#import "MSALTelemetry+Internal.h"
-#import "MSALTelemetryEventStrings.h"
+#import "MSIDTelemetry+Internal.h"
+#import "MSIDTelemetryEventStrings.h"
 
-#import "NSURL+MSALExtensions.h"
+#import "NSURL+MSIDExtensions.h"
 
 @interface MSALSilentRequest()
 {
@@ -84,7 +84,7 @@
         {
             if (error == nil && !_parameters.unvalidatedAuthority)
             {
-                error = CREATE_LOG_ERROR(_parameters, MSALErrorNoAccessTokensFound,
+                error = CREATE_MSID_LOG_ERROR(_parameters, MSALErrorNoAccessTokensFound,
                                          @"Failed to find any access tokens matching user and client ID in cache, and we have no authority to use.");
             }
             
@@ -116,7 +116,7 @@
         }
     }
     
-    _refreshToken = [cache findRefreshTokenWithEnvironment:[_parameters.unvalidatedAuthority msalHostWithPort]
+    _refreshToken = [cache findRefreshTokenWithEnvironment:[_parameters.unvalidatedAuthority msidHostWithPortIfNecessary]
                                                   clientId:_parameters.clientId
                                             userIdentifier:_parameters.user.userIdentifier
                                                    context:_parameters
@@ -135,8 +135,8 @@
             return;
         }
         
-        LOG_INFO(weakSelf.parameters, @"Refreshing access token");
-        LOG_INFO_PII(weakSelf.parameters, @"Refreshing access token");
+        MSID_LOG_INFO(weakSelf.parameters, @"Refreshing access token");
+        MSID_LOG_INFO_PII(weakSelf.parameters, @"Refreshing access token");
         
         self->_authority = authority;
         
@@ -146,8 +146,8 @@
 
 - (void)addAdditionalRequestParameters:(NSMutableDictionary<NSString *,NSString *> *)parameters
 {
-    parameters[OAUTH2_GRANT_TYPE] = OAUTH2_REFRESH_TOKEN;
-    parameters[OAUTH2_REFRESH_TOKEN] = [_refreshToken refreshToken];
+    parameters[MSID_OAUTH2_GRANT_TYPE] = MSID_OAUTH2_REFRESH_TOKEN;
+    parameters[MSID_OAUTH2_REFRESH_TOKEN] = [_refreshToken refreshToken];
 }
 
 
