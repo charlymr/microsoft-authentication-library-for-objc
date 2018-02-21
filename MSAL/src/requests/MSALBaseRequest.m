@@ -42,7 +42,18 @@
 
 static MSALScopes *s_reservedScopes = nil;
 
+@interface MSALBaseRequest ()
+
+@property (nonnull, readwrite) MSALRequestParameters *parameters;
+@property (readwrite) MSALAuthority *authority;
+@property (readwrite) MSALTelemetryApiId apiId;
+
+@end
+
 @implementation MSALBaseRequest
+
+@synthesize parameters = _parameters;
+@synthesize authority = _authority;
 
 + (void)initialize
 {
@@ -170,6 +181,7 @@ static MSALScopes *s_reservedScopes = nil;
     [self addAdditionalRequestParameters:reqParameters];
     authRequest.bodyParameters = reqParameters;
     
+    __weak typeof(self) weakSelf = self;
     [authRequest sendPost:^(MSALHttpResponse *response, NSError *error)
      {
          MSALTelemetryAPIEvent *event = [self getTelemetryAPIEvent];
@@ -198,7 +210,7 @@ static MSALScopes *s_reservedScopes = nil;
          {
              MSALErrorCode code = MSALErrorCodeForOAuthError(oauthError, MSALErrorInteractionRequired);
              
-             NSError *msalError = CREATE_LOG_ERROR_WITH_SUBERRORS(_parameters, code, oauthError, tokenResponse.subError, @"%@", tokenResponse.errorDescription);
+             NSError *msalError = CREATE_LOG_ERROR_WITH_SUBERRORS(weakSelf.parameters, code, oauthError, tokenResponse.subError, @"%@", tokenResponse.errorDescription);
              
              [self stopTelemetryEvent:event error:msalError];
              
@@ -209,9 +221,9 @@ static MSALScopes *s_reservedScopes = nil;
          
          if ([NSString msalIsStringNilOrBlank:tokenResponse.scope])
          {
-             LOG_INFO(_parameters, @"No scope in server response, using passed in scope instead.");
-             LOG_INFO_PII(_parameters, @"No scope in server response, using passed in scope instead.");
-             tokenResponse.scope = _parameters.scopes.msalToString;
+             LOG_INFO(weakSelf.parameters, @"No scope in server response, using passed in scope instead.");
+             LOG_INFO_PII(weakSelf.parameters, @"No scope in server response, using passed in scope instead.");
+             tokenResponse.scope = weakSelf.parameters.scopes.msalToString;
          }
          
          // For silent flow, with grant type being OAUTH2_REFRESH_TOKEN, this value may be missing from the response.
@@ -221,8 +233,8 @@ static MSALScopes *s_reservedScopes = nil;
              if (!tokenResponse.refreshToken)
              {
                  tokenResponse.refreshToken = reqParameters[OAUTH2_REFRESH_TOKEN];
-                 LOG_WARN(_parameters, @"Refresh token was missing from the token refresh response, so the refresh token in the request is returned instead");
-                 LOG_WARN_PII(_parameters, @"Refresh token was missing from the token refresh response, so the refresh token in the request is returned instead");
+                 LOG_WARN(weakSelf.parameters, @"Refresh token was missing from the token refresh response, so the refresh token in the request is returned instead");
+                 LOG_WARN_PII(weakSelf.parameters, @"Refresh token was missing from the token refresh response, so the refresh token in the request is returned instead");
              }
          }
          
@@ -231,22 +243,22 @@ static MSALScopes *s_reservedScopes = nil;
                                                                                error:&error];
          if (!clientInfo)
          {
-             LOG_ERROR(_parameters, @"Client info was not returned in the server response");
-             LOG_ERROR_PII(_parameters, @"Client info was not returned in the server response");
+             LOG_ERROR(weakSelf.parameters, @"Client info was not returned in the server response");
+             LOG_ERROR_PII(weakSelf.parameters, @"Client info was not returned in the server response");
              completionBlock(nil, error);
              return;
          }
-         if (_parameters.user != nil &&
-             ![_parameters.user.userIdentifier isEqualToString:clientInfo.userIdentifier])
+         if (weakSelf.parameters.user != nil &&
+             ![weakSelf.parameters.user.userIdentifier isEqualToString:clientInfo.userIdentifier])
          {
-             NSError *userMismatchError = CREATE_LOG_ERROR(_parameters, MSALErrorMismatchedUser, @"Different user was returned from the server");
+             NSError *userMismatchError = CREATE_LOG_ERROR(weakSelf.parameters, MSALErrorMismatchedUser, @"Different user was returned from the server");
              completionBlock(nil, userMismatchError);
              return;
          }
          
          if ([NSString msalIsStringNilOrBlank:tokenResponse.accessToken])
          {
-             NSError *noAccessTokenError = CREATE_LOG_ERROR(_parameters, MSALErrorNoAccessTokenInResponse, @"Token response is missing the access token");
+             NSError *noAccessTokenError = CREATE_LOG_ERROR(weakSelf.parameters, MSALErrorNoAccessTokenInResponse, @"Token response is missing the access token");
              completionBlock(nil, noAccessTokenError);
              return;
          }
@@ -254,10 +266,10 @@ static MSALScopes *s_reservedScopes = nil;
          NSError *cacheError = nil;
          MSALTokenCache *cache = self.parameters.tokenCache;
          
-         MSALAccessTokenCacheItem *atItem = [cache saveAccessTokenWithAuthority:_parameters.unvalidatedAuthority
-                                                                       clientId:_parameters.clientId
+         MSALAccessTokenCacheItem *atItem = [cache saveAccessTokenWithAuthority:weakSelf.parameters.unvalidatedAuthority
+                                                                       clientId:weakSelf.parameters.clientId
                                                                        response:tokenResponse
-                                                                        context:_parameters
+                                                                        context:weakSelf.parameters
                                                                           error:&cacheError];
          
          if (!atItem)
@@ -266,10 +278,10 @@ static MSALScopes *s_reservedScopes = nil;
              return;
          }
 
-         MSALRefreshTokenCacheItem *rtItem =  [cache saveRefreshTokenWithEnvironment:_parameters.unvalidatedAuthority.msalHostWithPort
-                                                                            clientId:_parameters.clientId
+         MSALRefreshTokenCacheItem *rtItem =  [cache saveRefreshTokenWithEnvironment:weakSelf.parameters.unvalidatedAuthority.msalHostWithPort
+                                                                            clientId:weakSelf.parameters.clientId
                                                                             response:tokenResponse
-                                                                             context:_parameters
+                                                                             context:weakSelf.parameters
                                                                                error:&cacheError];
          if (!rtItem && cacheError)
          {

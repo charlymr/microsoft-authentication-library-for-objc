@@ -31,10 +31,8 @@
 
 @interface MSALWebAuthResponse()
 
-{
-    MSALWebAuthRequest *_request;
-    id<MSALRequestContext> _context;
-}
+@property (readwrite) MSALWebAuthRequest *request;
+@property (readwrite) id<MSALRequestContext> context;
 
 @end
 
@@ -100,8 +98,9 @@ NSString *const s_kWwwAuthenticateHeader = @"Accept";
                 _request.retryIfServerError = NO;
 
                 // retry once after hald second
+                
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                    [_request resend:completionHandler];
+                    [self->_request resend:completionHandler];
                 });
                 return;
             }

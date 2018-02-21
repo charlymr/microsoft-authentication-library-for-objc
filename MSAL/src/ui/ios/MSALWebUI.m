@@ -38,17 +38,16 @@ static MSALWebUI *s_currentWebSession = nil;
 
 @interface MSALWebUI () <SFSafariViewControllerDelegate>
 
+@property (readwrite) NSURL* url;
+@property (readwrite) SFSafariViewController* safariViewController;
+@property (readwrite) MSALWebUICompletionBlock completionBlock;
+@property (readwrite) id<MSALRequestContext> context;
+@property (readwrite) NSString* telemetryRequestId;
+@property (readwrite) MSALTelemetryUIEvent* telemetryEvent;
+
 @end
 
 @implementation MSALWebUI
-{
-    NSURL *_url;
-    SFSafariViewController *_safariViewController;
-    MSALWebUICompletionBlock _completionBlock;
-    id<MSALRequestContext> _context;
-    NSString *_telemetryRequestId;
-    MSALTelemetryUIEvent *_telemetryEvent;
-}
 
 + (void)startWebUIWithURL:(NSURL *)url
                   context:(id<MSALRequestContext>)context
@@ -137,22 +136,23 @@ static MSALWebUI *s_currentWebSession = nil;
     
     [_telemetryEvent setIsCancelled:NO];
     
+    __weak typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-        _safariViewController = [[SFSafariViewController alloc] initWithURL:url
+        weakSelf.safariViewController = [[SFSafariViewController alloc] initWithURL:url
                                   entersReaderIfAvailable:NO];
-        _safariViewController.delegate = self;
+        weakSelf.safariViewController.delegate = self;
         UIViewController *viewController = [UIApplication msalCurrentViewController];
         if (!viewController)
         {
             [self clearCurrentWebSession];
-            ERROR_COMPLETION(_context, MSALErrorNoViewController, @"MSAL was unable to find the current view controller.");
+            ERROR_COMPLETION(weakSelf.context, MSALErrorNoViewController, @"MSAL was unable to find the current view controller.");
         }
         
-        [viewController presentViewController:_safariViewController animated:YES completion:nil];
+        [viewController presentViewController:weakSelf.safariViewController animated:YES completion:nil];
         
-        @synchronized (self)
+        @synchronized (weakSelf)
         {
-            _completionBlock = completionBlock;
+            weakSelf.completionBlock = completionBlock;
         }
     });
 }
@@ -178,33 +178,34 @@ static MSALWebUI *s_currentWebSession = nil;
 - (BOOL)completeSessionWithResponse:(NSURL *)response
                             orError:(NSError *)error
 {
+    __weak typeof(self) weakSelf = self;
     if ([NSThread isMainThread])
     {
-        [_safariViewController dismissViewControllerAnimated:YES completion:nil];
+        [weakSelf.safariViewController dismissViewControllerAnimated:YES completion:nil];
     }
     else
     {
         dispatch_async(dispatch_get_main_queue(), ^{
-            [_safariViewController dismissViewControllerAnimated:YES completion:nil];
+            [weakSelf.safariViewController dismissViewControllerAnimated:YES completion:nil];
         });
     }
     
     MSALWebUICompletionBlock completionBlock = nil;
     @synchronized (self)
     {
-        completionBlock = _completionBlock;
-        _completionBlock = nil;
+        completionBlock = weakSelf.completionBlock;
+        weakSelf.completionBlock = nil;
     }
     
-    _safariViewController = nil;
+    self.safariViewController = nil;
     
     if (!completionBlock)
     {
-        LOG_ERROR(_context, @"MSAL response received but no completion block saved");
+        LOG_ERROR(self.context, @"MSAL response received but no completion block saved");
         return NO;
     }
     
-    [[MSALTelemetry sharedInstance] stopEvent:_telemetryRequestId event:_telemetryEvent];
+    [[MSALTelemetry sharedInstance] stopEvent:self.telemetryRequestId event:self.telemetryEvent];
     
     completionBlock(response, error);
     return YES;

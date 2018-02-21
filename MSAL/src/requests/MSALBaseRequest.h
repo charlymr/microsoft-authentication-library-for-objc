@@ -39,7 +39,6 @@
     @protected
     MSALRequestParameters *_parameters;
     MSALAuthority *_authority;
-    MSALTelemetryApiId _apiId;
 }
 
 @property (nullable) MSALTokenResponse *response;

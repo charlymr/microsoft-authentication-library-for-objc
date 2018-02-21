@@ -182,6 +182,7 @@ static NSString *const s_kHttpHeaderDelimeter = @",";
              : @"unknown host");
     LOG_INFO_PII(_context, @"HTTP request %@", request.URL.absoluteString);
     
+    __weak typeof(self) weakSelf = self;
     NSURLSessionDataTask *task = [_session dataTaskWithRequest:request
                                              completionHandler:^(NSData *data, NSURLResponse *response, NSError *error)
                                   {
@@ -189,7 +190,7 @@ static NSString *const s_kHttpHeaderDelimeter = @",";
                                       {
                                           [event setHttpErrorCode:[NSString stringWithFormat: @"%ld", (long)[error code]]];
                                           [event setHttpErrorDomain:[error domain]];
-                                          [[MSALTelemetry sharedInstance] stopEvent:[_context telemetryRequestId] event:event];
+                                          [[MSALTelemetry sharedInstance] stopEvent:[weakSelf.context telemetryRequestId] event:event];
                                           
                                           completionHandler(nil, error);
                                           return;
@@ -203,7 +204,7 @@ static NSString *const s_kHttpHeaderDelimeter = @",";
                                       [event setHttpRequestIdHeader:[msalResponse.headers objectForKey:OAUTH2_CORRELATION_ID_REQUEST_VALUE]];
                                       [event setOAuthErrorCode:msalResponse];
                                       
-                                      [[MSALTelemetry sharedInstance] stopEvent:[_context telemetryRequestId] event:event];
+                                      [[MSALTelemetry sharedInstance] stopEvent:[weakSelf.context telemetryRequestId] event:event];
                                       
                                       completionHandler(msalResponse, error);
                                   }];

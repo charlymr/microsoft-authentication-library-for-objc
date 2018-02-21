@@ -124,6 +124,7 @@
     
     CHECK_ERROR_COMPLETION(_refreshToken, _parameters, MSALErrorAuthorizationFailed, @"No token matching arguments found in the cache")
     
+    __weak typeof(self) weakSelf = self;
     [super resolveEndpoints:^(MSALAuthority *authority, NSError *error) {
         if (error)
         {
@@ -134,10 +135,10 @@
             return;
         }
         
-        LOG_INFO(_parameters, @"Refreshing access token");
-        LOG_INFO_PII(_parameters, @"Refreshing access token");
+        LOG_INFO(weakSelf.parameters, @"Refreshing access token");
+        LOG_INFO_PII(weakSelf.parameters, @"Refreshing access token");
         
-        _authority = authority;
+        self->_authority = authority;
         
         [super acquireToken:completionBlock];
     }];

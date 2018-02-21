@@ -41,11 +41,12 @@
 
 static MSALInteractiveRequest *s_currentRequest = nil;
 
+@interface MSALInteractiveRequest ()
+@property (copy) NSString *code;
+@property MSALPkce *pkce;
+@end
+
 @implementation MSALInteractiveRequest
-{
-    NSString *_code;
-    MSALPkce *_pkce;
-}
 
 - (id)initWithParameters:(MSALRequestParameters *)parameters
     extraScopesToConsent:(NSArray<NSString *> *)extraScopesToConsent
@@ -157,18 +158,19 @@ static MSALInteractiveRequest *s_currentRequest = nil;
 
 - (void)acquireToken:(MSALCompletionBlock)completionBlock
 {
+    __weak typeof(self) weakSelf = self;
     [super resolveEndpoints:^(MSALAuthority *authority, NSError *error) {
         if (error)
         {
-            MSALTelemetryAPIEvent *event = [self getTelemetryAPIEvent];
-            [self stopTelemetryEvent:event error:error];
+            MSALTelemetryAPIEvent *event = [weakSelf getTelemetryAPIEvent];
+            [weakSelf stopTelemetryEvent:event error:error];
             
             completionBlock(nil, error);
             return;
         }
         
-        _authority = authority;
-        [self acquireTokenImpl:completionBlock];
+        self->_authority = authority;
+        [weakSelf acquireTokenImpl:completionBlock];
     }];
 }
 
@@ -180,6 +182,7 @@ static MSALInteractiveRequest *s_currentRequest = nil;
     LOG_INFO_PII(_parameters, @"Launching Web UI with URL: %@", authorizationUrl);
     s_currentRequest = self;
     
+    __weak typeof(self) weakSelf = self;
     [MSALWebUI startWebUIWithURL:authorizationUrl
                          context:_parameters
                  completionBlock:^(NSURL *response, NSError *error)
@@ -197,16 +200,16 @@ static MSALInteractiveRequest *s_currentRequest = nil;
          if ([NSString msalIsStringNilOrBlank:response.absoluteString])
          {
              // This error case *really* shouldn't occur. If we're seeing it it's almost certainly a developer bug
-             ERROR_COMPLETION(_parameters, MSALErrorNoAuthorizationResponse, @"No authorization response received from server.");
+             ERROR_COMPLETION(weakSelf.parameters, MSALErrorNoAuthorizationResponse, @"No authorization response received from server.");
          }
          
          NSDictionary *params = [NSDictionary msalURLFormDecode:response.query];
-         CHECK_ERROR_COMPLETION(params, _parameters, MSALErrorBadAuthorizationResponse, @"Authorization response from the server code not be decoded.");
+         CHECK_ERROR_COMPLETION(params, weakSelf.parameters, MSALErrorBadAuthorizationResponse, @"Authorization response from the server code not be decoded.");
          
-         CHECK_ERROR_COMPLETION([_state isEqualToString:params[OAUTH2_STATE]], _parameters, MSALErrorInvalidState, @"State returned from the server does not match");
+         CHECK_ERROR_COMPLETION([weakSelf.state isEqualToString:params[OAUTH2_STATE]], weakSelf.parameters, MSALErrorInvalidState, @"State returned from the server does not match");
          
-         _code = params[OAUTH2_CODE];
-         if (_code)
+         weakSelf.code = params[OAUTH2_CODE];
+         if (weakSelf.code)
          {
              [super acquireToken:completionBlock];
              return;
@@ -218,7 +221,7 @@ static MSALInteractiveRequest *s_currentRequest = nil;
              NSString *errorDescription = params[OAUTH2_ERROR_DESCRIPTION];
              NSString *subError = params[OAUTH2_SUB_ERROR];
              MSALErrorCode code = MSALErrorCodeForOAuthError(authorizationError, MSALErrorAuthorizationFailed);
-             MSALLogError(_parameters, MSALErrorDomain, code, errorDescription, authorizationError, subError, __FUNCTION__, __LINE__);
+             MSALLogError(weakSelf.parameters, MSALErrorDomain, code, errorDescription, authorizationError, subError, __FUNCTION__, __LINE__);
              
              NSError *msalError = MSALCreateError(MSALErrorDomain, code, errorDescription, authorizationError, subError, nil);
                           
@@ -229,7 +232,7 @@ static MSALInteractiveRequest *s_currentRequest = nil;
              return;
          }
          
-         ERROR_COMPLETION(_parameters, MSALErrorBadAuthorizationResponse, @"No code or error in server response.");
+         ERROR_COMPLETION(weakSelf.parameters, MSALErrorBadAuthorizationResponse, @"No code or error in server response.");
      }];
 
     
