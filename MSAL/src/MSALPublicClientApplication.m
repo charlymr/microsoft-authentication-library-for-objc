@@ -57,7 +57,9 @@
 @interface MSALPublicClientApplication()
 
 @property (nonatomic) MSIDDefaultTokenCacheAccessor *tokenCache;
+#if TARGET_OS_IPHONE
 @property (nonatomic, readwrite) NSString *keychainGroup;
+#endif
 
 @end
 
@@ -120,9 +122,6 @@
     }
     REQUIRED_PARAMETER(clientId, nil);
     _clientId = clientId;
-    
-    // Optional Paramater
-    _keychainGroup = keychainGroup;
 
     if (authority)
     {
@@ -139,6 +138,9 @@
                                                      error:error]);
     
 #if TARGET_OS_IPHONE
+    // Optional Paramater
+    _keychainGroup = keychainGroup;
+
     MSIDKeychainTokenCache *dataSource;
     if (_keychainGroup != nil)
     {
